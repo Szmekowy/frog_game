@@ -124,6 +124,18 @@ void frog_jump(int ch, stan_gry &gra)
     wrefresh(gra.frog.win->win);
 }
 void startowe_predkosci_aut(stan_gry &gra, int i);
+void odmierz_czas(int &czas, int &licznik_iteracji, int limit_iteracji)
+{
+    // Zwiększamy licznik iteracji
+    licznik_iteracji++;
+
+    // Jeżeli licznik iteracji osiągnie próg (np. 10 iteracji = 1 sekunda)
+    if (licznik_iteracji >= limit_iteracji)
+    {
+        czas++;               // Zwiększamy licznik czasu
+        licznik_iteracji = 0; // Resetujemy licznik iteracji
+    }
+}
 void car_go(stan_gry &gra, int i)
 {
     nodelay(stdscr, TRUE);
@@ -131,45 +143,49 @@ void car_go(stan_gry &gra, int i)
     wrefresh(gra.car[i].win->win);
     mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI)); // Aktywacja niebieskiej pary kolorów
-    mvwprintw(gra.car[i].win->win, 0, 0, " ");
-    mvwprintw(gra.car[i].win->win, 1, 0, " "); // Rysowanie samochodu
-    gra.car[i].poz_pion += gra.car[i].speed;
+    mvwprintw(gra.car[i].win->win, 0, 0, "#");
+    mvwprintw(gra.car[i].win->win, 1, 0, "#");
+    mvwprintw(gra.car[i].win->win, 0, 1, "#");
+    mvwprintw(gra.car[i].win->win, 1, 1, "#");
+    mvwprintw(gra.car[i].win->win, 0, 2, "#");
+    mvwprintw(gra.car[i].win->win, 1, 2, "#");
+    gra.car[i].poz_pion += 1;
     wrefresh(gra.car[i].win->win);
     if (gra.car[i].poz_pion >= WYS - 1)
     {
         startowe_predkosci_aut(gra, i);
         gra.car[i].poz_pion = 1;
     }
-    usleep(20000);
+    usleep(7000);
 }
 int rozmiar_aut() // losowanie rozmiaru auta
 {
-    return rand() % 7 + 1;
+    return 2; // rand() % 7 + 1;
 }
 void startowe_pozycje_aut(stan_gry &gra)
 {
     int a = 5;
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < AUTA; i++)
     {
         gra.car[i].poz_poziom = a + 1;
-        a += rozmiar_aut();
+        a += rozmiar_aut() + 2;
     }
 }
 void startowe_predkosci_aut(stan_gry &gra, int i)
 {
-    gra.car[i].speed = rand() % 3 + 1;
+    gra.car[i].speed = rand() % 5 + 1;
 }
 void tworzenie_okien_wyswietlania(stan_gry &gra, int i)
 {
     okno *car_window = new okno;
-    car_window->win = newwin(2, 2, gra.car[i].poz_pion, gra.car[i].poz_poziom);
+    car_window->win = newwin(2, 3, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     gra.car[i].win = car_window;
 }
 int czy_kolicja(stan_gry &gra)
 {
     for (int i = 0; i < AUTA; i++)
     {
-        if (gra.frog.poz_pion == gra.car[i].poz_pion + 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion - 1 == gra.car[i].poz_pion + 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion - 1 == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom)
+        if (gra.frog.poz_pion == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion == gra.car[i].poz_pion - 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom)
         {
             return 1;
             break;
@@ -186,6 +202,9 @@ int wygrana(stan_gry gra)
 }
 void podczasgry(stan_gry &gra)
 {
+    int czas = 0;             // Zmienna przechowująca upływający czas (np. w sekundach)
+    int licznik_iteracji = 0; // Licznik iteracji pętli
+    int limit_iteracji = 10;
     startowe_pozycje_aut(gra);
     for (int i = 0; i < AUTA; i++)
     {
@@ -201,7 +220,10 @@ void podczasgry(stan_gry &gra)
     {
         for (int i = 0; i < AUTA; i++)
         {
-            car_go(gra, i);
+            odmierz_czas(czas, licznik_iteracji, limit_iteracji);
+            usleep(6000);
+            if (czas % gra.car[i].speed == 0 || czas % gra.car[i].speed == 1)
+                car_go(gra, i);
             ch = getch();
             kolizja = czy_kolicja(gra);
             if (kolizja == 1)
@@ -211,6 +233,7 @@ void podczasgry(stan_gry &gra)
                 refresh();
                 break;
             }
+            // timeout(10000);
             frog_jump(ch, gra);
             flushinp();
             if (wygrana(gra))
