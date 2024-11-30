@@ -2,12 +2,24 @@
 #include <ncurses.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
+#include <cstdlib>
 using namespace std;
 
-#define ESC 27
-#define WYS 30
-#define SZER 300
+#define WYS 20
+#define SZER 75
 #define K_CZEROWNY 1
+#define K_NIEBIESKI 2
+#define K_ZOLTY 3
+#define K_ZIELONY 4
+#define AUTA 10
+struct okno
+{
+    WINDOW *win;
+    int color;
+    int a;
+    int b;
+};
 
 struct stan_gry
 {
@@ -19,6 +31,20 @@ struct stan_gry
         int wys = WYS;
         int szer = SZER;
     } plansza;
+    struct
+    {
+        int poz_pion = 10;
+        int poz_poziom = 0;
+        okno *win;
+    } frog;
+
+    struct
+    {
+        int poz_pion = 1;
+        int poz_poziom = 5;
+        int speed = 3;
+        okno *win;
+    } car[AUTA];
 };
 
 void zapis(stan_gry &gra, FILE *plik)
@@ -36,7 +62,6 @@ void zapis(stan_gry &gra, FILE *plik)
 
 void odczyt(stan_gry &gra, FILE *plik)
 {
-
     if (plik == NULL)
     {
         clear();
@@ -54,52 +79,203 @@ void wypisztest(stan_gry &gra)
     mvprintw(1, 0, "%d", gra.plansza.szer);
     refresh();
 }
+
 void czerwone_pole()
 {
-    timeout(100);
-    int ch = ERR;
-    while (ch != ESC)
+    attron(COLOR_PAIR(K_CZEROWNY));
+    for (int i = 0; i < SZER; i++)
     {
-        ch = getch();
-        for (int i = 0; i < SZER; i++)
+        mvprintw(0, i, " ");
+        refresh();
+    }
+    for (int i = 0; i < SZER; i++)
+    {
+        mvprintw(WYS, i, " ");
+        refresh();
+    }
+}
+void zielone_pole()
+{
+    attron(COLOR_PAIR(K_ZIELONY));
+    for (int i = 1; i < WYS; i++)
+    {
+        mvprintw(i, SZER - 1, " ");
+        refresh();
+    }
+    attroff(COLOR_PAIR(K_ZIELONY));
+}
+
+// Funkcja do poruszania żabą
+void frog_jump(int ch, stan_gry &gra)
+{
+    wclear(gra.frog.win->win);
+    wrefresh(gra.frog.win->win);
+    if (ch == 's')
+        gra.frog.poz_pion++;
+    else if (ch == 'w')
+        gra.frog.poz_pion--;
+    else if (ch == 'd')
+        gra.frog.poz_poziom++;
+    else if (ch == 'a')
+        gra.frog.poz_poziom--;
+    mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
+    wattron(gra.frog.win->win, COLOR_PAIR(K_ZOLTY));
+    mvwprintw(gra.frog.win->win, 0, 0, " ");
+    wrefresh(gra.frog.win->win);
+}
+void startowe_predkosci_aut(stan_gry &gra, int i);
+void car_go(stan_gry &gra, int i)
+{
+    nodelay(stdscr, TRUE);
+    wclear(gra.car[i].win->win);
+    wrefresh(gra.car[i].win->win);
+    mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
+    wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI)); // Aktywacja niebieskiej pary kolorów
+    mvwprintw(gra.car[i].win->win, 0, 0, " ");
+    mvwprintw(gra.car[i].win->win, 1, 0, " "); // Rysowanie samochodu
+    gra.car[i].poz_pion += gra.car[i].speed;
+    wrefresh(gra.car[i].win->win);
+    if (gra.car[i].poz_pion >= WYS - 1)
+    {
+        startowe_predkosci_aut(gra, i);
+        gra.car[i].poz_pion = 1;
+    }
+    usleep(20000);
+}
+int rozmiar_aut() // losowanie rozmiaru auta
+{
+    return rand() % 7 + 1;
+}
+void startowe_pozycje_aut(stan_gry &gra)
+{
+    int a = 5;
+    for (int i = 0; i < 10; i++)
+    {
+        gra.car[i].poz_poziom = a + 1;
+        a += rozmiar_aut();
+    }
+}
+void startowe_predkosci_aut(stan_gry &gra, int i)
+{
+    gra.car[i].speed = rand() % 3 + 1;
+}
+void tworzenie_okien_wyswietlania(stan_gry &gra, int i)
+{
+    okno *car_window = new okno;
+    car_window->win = newwin(2, 2, gra.car[i].poz_pion, gra.car[i].poz_poziom);
+    gra.car[i].win = car_window;
+}
+int czy_kolicja(stan_gry &gra)
+{
+    for (int i = 0; i < AUTA; i++)
+    {
+        if (gra.frog.poz_pion == gra.car[i].poz_pion + 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion - 1 == gra.car[i].poz_pion + 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion - 1 == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom)
         {
-            mvprintw(0, i, " ");
-            refresh();
-        }
-        for (int i = 0; i < SZER; i++)
-        {
-            mvprintw(WYS, i, " ");
-            refresh();
+            return 1;
+            break;
         }
     }
-    clear();
-    refresh();
+    return 0;
 }
-void podczasgry(stan_gry gra)
+int wygrana(stan_gry gra)
 {
+    if (gra.frog.poz_poziom == SZER - 1)
+        return 1;
+    else
+        return 0;
+}
+void podczasgry(stan_gry &gra)
+{
+    startowe_pozycje_aut(gra);
+    for (int i = 0; i < AUTA; i++)
+    {
+        startowe_predkosci_aut(gra, i);
+        tworzenie_okien_wyswietlania(gra, i);
+    }
+    timeout(100);
+    int ch = ERR;
     czerwone_pole();
+    zielone_pole();
+    int kolizja = 0;
+    while (ch != 'p' || kolizja == 1)
+    {
+        for (int i = 0; i < AUTA; i++)
+        {
+            car_go(gra, i);
+            ch = getch();
+            kolizja = czy_kolicja(gra);
+            if (kolizja == 1)
+            {
+                clear();
+                mvprintw(10, 10, "KONIEC GRY");
+                refresh();
+                break;
+            }
+            frog_jump(ch, gra);
+            flushinp();
+            if (wygrana(gra))
+            {
+            }
+            kolizja = czy_kolicja(gra);
+            if (kolizja == 1)
+            {
+                clear();
+                mvprintw(10, 10, "KONIEC GRY");
+                refresh();
+                break;
+            }
+            if (ch == 'p')
+                break;
+        }
+        if (kolizja == 1 || wygrana(gra))
+            break;
+    }
+    if (kolizja == 1)
+    {
+        clear();
+        mvprintw(10, 10, "KONIEC GRY");
+        mvprintw(11, 10, "NACISNIJ P ABY ZAKONCZYC");
+        refresh();
+    }
+    else
+    {
+        clear();
+        mvprintw(10, 10, "KONIEC GRY -> WYGRALES");
+        mvprintw(11, 10, "NACISNIJ P ABY ZAKONCZYC");
+        refresh();
+    }
+
+    while (ch != 'p')
+        ch = getch();
 }
 
 void ustawienia()
 {
+    srand(time(NULL));
     initscr();
     keypad(stdscr, TRUE);
     noecho();
     curs_set(0);
     start_color();
     init_pair(K_CZEROWNY, COLOR_RED, COLOR_RED);
+    init_pair(K_NIEBIESKI, COLOR_BLUE, COLOR_BLUE);
+    init_pair(K_ZOLTY, COLOR_YELLOW, COLOR_YELLOW);
+    init_pair(K_ZIELONY, COLOR_GREEN, COLOR_GREEN);
 }
+
 int main()
 {
-
     ustawienia();
-    attron(COLOR_PAIR(K_CZEROWNY));
     stan_gry gra;
     FILE *plik;
     plik = fopen("struktura.txt", "r+");
+
+    // Tworzymy okno o rozmiarze 2x2 dla żaby
+    okno *frog_window = new okno;
+    frog_window->win = newwin(1, 1, gra.frog.poz_pion, gra.frog.poz_poziom);
+    gra.frog.win = frog_window;
     podczasgry(gra);
     fclose(plik);
-    wypisztest(gra);
     endwin(); // Kończy pracę z ncurses
     return 0;
 }
