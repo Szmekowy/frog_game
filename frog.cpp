@@ -6,14 +6,12 @@
 #include <cstdlib>
 using namespace std;
 
-#define WYS 20
-#define SZER 75
 #define K_CZEROWNY 1
 #define K_NIEBIESKI 2
 #define K_ZOLTY 3
 #define K_ZIELONY 4
 #define K_BIALY 5
-#define AUTA 10
+
 struct okno
 {
     WINDOW *win;
@@ -25,20 +23,21 @@ struct timer
 {
     int czas = 0;
     int iteracja = 0;
-    int limit_iteracji = 10;
+    const int limit_iteracji = 10;
     int licznik = 0;
-    int limit = 7;
+    const int limit = 7;
     int licznik_czasu = 0;
     int aktualny_czas = 0;
-    int kontrolne = 100;
+    const int kontrolne = 100;
 };
 struct stan_gry
 {
     timer *czas_gry;
     struct
     {
-        int wys = WYS;
-        int szer = SZER;
+        int wys;
+        int szer;
+        int auta;
     } plansza;
     struct
     {
@@ -53,7 +52,7 @@ struct stan_gry
         int poz_poziom = 5;
         int speed = 3;
         okno *win;
-    } car[AUTA];
+    } car[40];
     struct
     {
         int poz_pion = 21;
@@ -61,29 +60,23 @@ struct stan_gry
         okno *win;
     } status;
 };
+int ekran_startowy();
 void startowe_predkosci_aut(stan_gry &gra, int i);
-/// funkcja timera ///
-void odmierz_czas(stan_gry &gra)
-{
-    usleep(6000);
-    gra.czas_gry->iteracja++;
-    gra.czas_gry->licznik_czasu++;
-    if (gra.czas_gry->iteracja >= gra.czas_gry->limit_iteracji)
-    {
-        gra.czas_gry->czas++;
-        gra.czas_gry->iteracja = 0;
-    }
-    if (gra.czas_gry->licznik_czasu >= gra.czas_gry->kontrolne)
-    {
-        gra.czas_gry->aktualny_czas++;
-        gra.czas_gry->licznik_czasu = 0;
-    }
-
-    gra.czas_gry->licznik++;
-}
-/// funkcja timera ///
-
 /// zapis i odczyty z pliku ///
+void odczyt_rozgrywki(stan_gry &gra)
+{
+    FILE *plik_z_poziomami;
+    plik_z_poziomami = fopen("poziom.txt", "r");
+    int wczytany_poziom = ekran_startowy();
+    int poziom;
+    while (wczytany_poziom--)
+    {
+        fscanf(plik_z_poziomami, "%d", &poziom);
+        fscanf(plik_z_poziomami, "%d", &gra.plansza.wys);
+        fscanf(plik_z_poziomami, "%d", &gra.plansza.szer);
+        fscanf(plik_z_poziomami, "%d", &gra.plansza.auta);
+    }
+}
 void zapis(stan_gry &gra, FILE *plik)
 {
     if (plik == NULL)
@@ -109,6 +102,27 @@ void odczyt(stan_gry &gra, FILE *plik)
     fread(&gra, sizeof(struct stan_gry), 1, plik);
 }
 /// zapis i odczyt z pliku ///
+
+/// funkcja timera ///
+void odmierz_czas(stan_gry &gra)
+{
+    usleep(6000);
+    gra.czas_gry->iteracja++;
+    gra.czas_gry->licznik_czasu++;
+    if (gra.czas_gry->iteracja >= gra.czas_gry->limit_iteracji)
+    {
+        gra.czas_gry->czas++;
+        gra.czas_gry->iteracja = 0;
+    }
+    if (gra.czas_gry->licznik_czasu >= gra.czas_gry->kontrolne)
+    {
+        gra.czas_gry->aktualny_czas++;
+        gra.czas_gry->licznik_czasu = 0;
+    }
+
+    gra.czas_gry->licznik++;
+}
+/// funkcja timera ///
 
 /// Funkcja do poruszania żabą  ///
 void frog_jump(int ch, stan_gry &gra)
@@ -148,7 +162,7 @@ void car_go(stan_gry &gra, int i)
     mvwprintw(gra.car[i].win->win, 1, 2, "#");
     gra.car[i].poz_pion += 1;
     wrefresh(gra.car[i].win->win);
-    if (gra.car[i].poz_pion >= WYS - 1)
+    if (gra.car[i].poz_pion >= gra.plansza.wys - 1)
     {
         startowe_predkosci_aut(gra, i);
         gra.car[i].poz_pion = 1;
@@ -160,7 +174,7 @@ void car_go(stan_gry &gra, int i)
 /// sprawdzanie kolizji zaby z autem ///
 int czy_kolicja(stan_gry &gra)
 {
-    for (int i = 0; i < AUTA; i++)
+    for (int i = 0; i < gra.plansza.auta; i++)
     {
         if (gra.frog.poz_pion == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion == gra.car[i].poz_pion - 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom)
         {
@@ -175,7 +189,7 @@ int czy_kolicja(stan_gry &gra)
 /// sprawdzanie warunku wygranej i przegranej///
 int wygrana(stan_gry gra)
 {
-    if (gra.frog.poz_poziom == SZER - 1)
+    if (gra.frog.poz_poziom == gra.plansza.szer - 1)
     {
         clear();
         mvprintw(10, 10, "KONIEC GRY -> WYGRALES");
@@ -198,26 +212,26 @@ void przegrana(stan_gry gra)
 /// sprawdzanie warunku wygranej i przegranej///
 
 /// poczatkowe rysowanie planszy ///
-void czerwone_pole() // rysowanie czerwonej obwodki
+void czerwone_pole(stan_gry gra) // rysowanie czerwonej obwodki
 {
     attron(COLOR_PAIR(K_CZEROWNY));
-    for (int i = 0; i < SZER; i++)
+    for (int i = 0; i < gra.plansza.szer; i++)
     {
         mvprintw(0, i, " ");
         refresh();
     }
-    for (int i = 0; i < SZER; i++)
+    for (int i = 0; i < gra.plansza.szer; i++)
     {
-        mvprintw(WYS, i, " ");
+        mvprintw(gra.plansza.wys, i, " ");
         refresh();
     }
 }
-void zielone_pole() // rysowanie mety
+void zielone_pole(stan_gry gra) // rysowanie mety
 {
     attron(COLOR_PAIR(K_ZIELONY));
-    for (int i = 1; i < WYS; i++)
+    for (int i = 1; i < gra.plansza.wys; i++)
     {
-        mvprintw(i, SZER - 1, " ");
+        mvprintw(i, gra.plansza.szer - 1, " ");
         refresh();
     }
     attroff(COLOR_PAIR(K_ZIELONY));
@@ -246,7 +260,7 @@ int rozmiar_aut() // losowanie rozmiaru auta
 void startowe_pozycje_aut(stan_gry &gra) // poczatkowe pozycje
 {
     int a = 5;
-    for (int i = 0; i < AUTA; i++)
+    for (int i = 0; i < gra.plansza.auta; i++)
     {
         gra.car[i].poz_poziom = a + 1;
         a += rozmiar_aut();
@@ -262,12 +276,57 @@ void tworzenie_okien_wyswietlania(stan_gry &gra, int i) // tworzenie okien dla a
     car_window->win = newwin(2, 3, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     gra.car[i].win = car_window;
 }
+int ekran_startowy()
+{
+    keypad(stdscr, TRUE);
+    int pozycja_kropki = 15;
+    int ch = ERR;
+    while (ch != 10)
+    {
+        attron(COLOR_PAIR(K_BIALY));
+        mvprintw(pozycja_kropki, 8, " ");
+        refresh();
+        attroff(COLOR_PAIR(K_BIALY));
+        mvprintw(13, 10, "Wybierz poziom: ");
+        mvprintw(15, 15, "Poziom pierwszy: ");
+        mvprintw(17, 15, "Poziom drugi: ");
+        mvprintw(19, 15, "Poziom trzeci: ");
+        refresh();
+        usleep(1000);
+        ch = getch();
+        if (ch == 's')
+        {
+            if (pozycja_kropki == 19)
+                pozycja_kropki = 15;
+            else
+                pozycja_kropki += 2;
+        }
+        else if (ch == 'w')
+        {
+            if (pozycja_kropki == 15)
+                pozycja_kropki = 19;
+            else
+                pozycja_kropki -= 2;
+        }
+        clear();
+        refresh();
+    }
+    attroff(COLOR_PAIR(K_BIALY));
+    clear();
+    refresh();
+    if (pozycja_kropki == 19)
+        return 3;
+    if (pozycja_kropki == 17)
+        return 2;
+    if (pozycja_kropki == 15)
+        return 1;
+}
 void start_gry(stan_gry &gra) // inicjalizacja początkowego stanu gry
 {
-    czerwone_pole();
-    zielone_pole();
+    czerwone_pole(gra);
+    zielone_pole(gra);
     startowe_pozycje_aut(gra);
-    for (int i = 0; i < AUTA; i++)
+    for (int i = 0; i < gra.plansza.auta; i++)
     {
         startowe_predkosci_aut(gra, i);
         tworzenie_okien_wyswietlania(gra, i);
@@ -286,7 +345,7 @@ void podczasgry(stan_gry &gra)
     int kolizja = 0;
     while (ch != 'p' || kolizja == 1 || wygrana(gra))
     {
-        for (int i = 0; i < AUTA; i++)
+        for (int i = 0; i < gra.plansza.auta; i++)
         {
             odmierz_czas(gra);
             status_gry(gra);
@@ -338,6 +397,7 @@ int main()
 {
     ustawienia();
     stan_gry gra;
+    odczyt_rozgrywki(gra);
     FILE *plik;
     plik = fopen("struktura.txt", "r+");
     // Tworzymy okno o rozmiarze 2x2 dla żaby
