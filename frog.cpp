@@ -51,6 +51,8 @@ struct stan_gry
         int poz_pion = 1;
         int poz_poziom = 5;
         int speed = 3;
+        int dlugosc = 2;
+        int szerokosc = 3;
         okno *win;
     } car[40];
     struct
@@ -63,18 +65,27 @@ struct stan_gry
 int ekran_startowy();
 void startowe_predkosci_aut(stan_gry &gra, int i);
 /// zapis i odczyty z pliku ///
-void odczyt_rozgrywki(stan_gry &gra)
+void odczyt_rozgrywki(stan_gry &gra) // przypisanie grze początkowego stanu
 {
     FILE *plik_z_poziomami;
     plik_z_poziomami = fopen("poziom.txt", "r");
     int wczytany_poziom = ekran_startowy();
     int poziom;
+    int pom_dlug = 0;
+    int pom_szer = 0;
     while (wczytany_poziom--)
     {
         fscanf(plik_z_poziomami, "%d", &poziom);
         fscanf(plik_z_poziomami, "%d", &gra.plansza.wys);
         fscanf(plik_z_poziomami, "%d", &gra.plansza.szer);
         fscanf(plik_z_poziomami, "%d", &gra.plansza.auta);
+        fscanf(plik_z_poziomami, "%d", &pom_dlug);
+        fscanf(plik_z_poziomami, "%d", &pom_szer);
+        for (int i = 0; i < gra.plansza.auta; i++)
+        {
+            gra.car[i].dlugosc = pom_dlug;
+            gra.car[i].szerokosc = pom_szer;
+        }
     }
 }
 void zapis(stan_gry &gra, FILE *plik)
@@ -154,12 +165,21 @@ void car_go(stan_gry &gra, int i)
     wrefresh(gra.car[i].win->win);
     mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI));
+    for (int a = 0; a < gra.car[i].dlugosc; a++)
+    {
+        for (int j = 0; j < gra.car[i].szerokosc; j++)
+        {
+            mvwprintw(gra.car[i].win->win, a, j, "#");
+        }
+    }
+    /*
     mvwprintw(gra.car[i].win->win, 0, 0, "#");
     mvwprintw(gra.car[i].win->win, 1, 0, "#");
     mvwprintw(gra.car[i].win->win, 0, 1, "#");
     mvwprintw(gra.car[i].win->win, 1, 1, "#");
     mvwprintw(gra.car[i].win->win, 0, 2, "#");
     mvwprintw(gra.car[i].win->win, 1, 2, "#");
+    */
     gra.car[i].poz_pion += 1;
     wrefresh(gra.car[i].win->win);
     if (gra.car[i].poz_pion >= gra.plansza.wys - 1)
@@ -243,7 +263,7 @@ void status_gry(stan_gry &gra)
 {
     // pamieć dla okna statusu
     okno *status_window = new okno;
-    status_window->win = newwin(2, 22, gra.status.poz_pion, gra.status.poz_poziom);
+    status_window->win = newwin(2, 22, gra.plansza.wys + 2, gra.status.poz_poziom);
     gra.status.win = status_window;
     // pamieć dla okna statusu
     wattron(gra.status.win->win, COLOR_PAIR(K_BIALY));
@@ -253,17 +273,13 @@ void status_gry(stan_gry &gra)
 /// wyswietlenie statusu gry ///
 
 /// nadanie wartosci elementą gry ///
-int rozmiar_aut() // losowanie rozmiaru auta
-{
-    return 4;
-}
 void startowe_pozycje_aut(stan_gry &gra) // poczatkowe pozycje
 {
     int a = 5;
     for (int i = 0; i < gra.plansza.auta; i++)
     {
         gra.car[i].poz_poziom = a + 1;
-        a += rozmiar_aut();
+        a += gra.car[i].szerokosc + 1;
     }
 }
 void startowe_predkosci_aut(stan_gry &gra, int i) // poczatkowa predkosc
@@ -273,7 +289,7 @@ void startowe_predkosci_aut(stan_gry &gra, int i) // poczatkowa predkosc
 void tworzenie_okien_wyswietlania(stan_gry &gra, int i) // tworzenie okien dla aut
 {
     okno *car_window = new okno;
-    car_window->win = newwin(2, 3, gra.car[i].poz_pion, gra.car[i].poz_poziom);
+    car_window->win = newwin(gra.car[i].dlugosc, gra.car[i].szerokosc, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     gra.car[i].win = car_window;
 }
 int ekran_startowy()
@@ -320,6 +336,7 @@ int ekran_startowy()
         return 2;
     if (pozycja_kropki == 15)
         return 1;
+    return -1;
 }
 void start_gry(stan_gry &gra) // inicjalizacja początkowego stanu gry
 {
