@@ -29,6 +29,8 @@ struct timer
     int licznik_czasu = 0;
     int aktualny_czas = 0;
     const int kontrolne = 100;
+    const int wyswietlanie_coinow = 1000;
+    int licznik_wyswietlania_coinow = 1000;
 };
 struct przeszkoda
 {
@@ -50,8 +52,8 @@ struct stan_gry
         int auta;
         int ilosc_przeszkod = 100;
         przeszkoda pozyjce_przeszkod[100];
-        int ilosc_coin = 10;
-        coiny pozyjce_coinow[10];
+        int ilosc_coin = 5;
+        coiny pozyjce_coinow[5];
     } plansza;
     struct
     {
@@ -75,6 +77,7 @@ struct stan_gry
     } car[40];
     struct
     {
+        int wynik = 0;
         int poz_pion = 21;
         int poz_poziom = 10;
         okno *win;
@@ -91,17 +94,42 @@ void ulica(stan_gry &gra)
             mvprintw(j, i, "|");
     }
 }
-void maluj_coiny(stan_gry &gra)
+void nowe_coiny(stan_gry &gra)
 {
-    int linia = rand() % (gra.plansza.szer + 1) - 1;
-    int wys = rand() % (gra.plansza.wys + 1) - 1;
-    okno *coin = new okno;
-    coin->win = newwin(1, 1, wys, linia);
-    //  gra.plansza.pozyjce_przeszkod[k].poz_pion = wys;
-    // gra.plansza.pozyjce_przeszkod[k].poz_poz = linia;
-    wattron(coin->win, COLOR_PAIR(K_ZOLTY));
-    mvwprintw(coin->win, 0, 0, "o");
-    wrefresh(coin->win);
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+    {
+        int linia = rand() % (gra.plansza.szer + 1) - 2;
+        int wys = rand() % (gra.plansza.wys - 1) + 1;
+        gra.plansza.pozyjce_coinow[i].poz_pion = wys;
+        gra.plansza.pozyjce_coinow[i].poz_poz = linia;
+    }
+}
+void odswierz_coiny(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+    {
+        if (gra.plansza.pozyjce_coinow[i].poz_pion != -1)
+        {
+            okno *coin = new okno;
+            coin->win = newwin(1, 1, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
+            wattron(coin->win, COLOR_PAIR(K_ZOLTY));
+            mvwprintw(coin->win, 0, 0, "o");
+            wrefresh(coin->win);
+        }
+    }
+}
+void usun_poprzednie_coiny(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+    {
+        if (gra.plansza.pozyjce_coinow[i].poz_pion != -1)
+        {
+            okno *coin = new okno;
+            coin->win = newwin(1, 1, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
+            mvwprintw(coin->win, 0, 0, " ");
+            wrefresh(coin->win);
+        }
+    }
 }
 void odczyt_rozgrywki(stan_gry &gra) // przypisanie grze początkowego stanu
 {
@@ -158,6 +186,7 @@ void odmierz_czas(stan_gry &gra)
     usleep(6000);
     gra.czas_gry->iteracja++;
     gra.czas_gry->licznik_czasu++;
+    gra.czas_gry->licznik_wyswietlania_coinow++;
     if (gra.czas_gry->iteracja >= gra.czas_gry->limit_iteracji)
     {
         gra.czas_gry->czas++;
@@ -168,7 +197,10 @@ void odmierz_czas(stan_gry &gra)
         gra.czas_gry->aktualny_czas++;
         gra.czas_gry->licznik_czasu = 0;
     }
-
+    if (gra.czas_gry->licznik_wyswietlania_coinow > gra.czas_gry->wyswietlanie_coinow)
+    {
+        gra.czas_gry->licznik_wyswietlania_coinow = 0;
+    }
     gra.czas_gry->licznik++;
 }
 /// funkcja timera ///
@@ -214,6 +246,19 @@ int czy_podwozka(stan_gry &gra)
     }
     return false;
 }
+int czy_coin(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+    {
+        if ((gra.frog.poz_poziom == gra.plansza.pozyjce_coinow[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_coinow[i].poz_pion))
+        {
+            gra.plansza.pozyjce_coinow[i].poz_poz = -1;
+            gra.plansza.pozyjce_coinow[i].poz_pion = -1;
+            return true;
+        }
+    }
+    return false;
+}
 void frog_jump(int ch, stan_gry &gra)
 {
     if (ch == 's' || ch == 'd' || ch == 'w' || ch == 'a')
@@ -243,7 +288,15 @@ void frog_jump(int ch, stan_gry &gra)
     else if (ch == 'e')
     {
         if (czy_podwozka(gra))
+        {
             gra.frog.poz_poziom += 10;
+            gra.status.wynik += 2;
+        }
+    }
+    else if (ch == 'q')
+    {
+        if (czy_coin(gra))
+            gra.status.wynik++;
     }
     mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
     wattron(gra.frog.win->win, COLOR_PAIR(K_ZOLTY));
@@ -406,6 +459,7 @@ void status_gry(stan_gry &gra)
     // pamieć dla okna statusu
     wattron(gra.status.win->win, COLOR_PAIR(K_BIALY));
     mvwprintw(gra.status.win->win, 0, 0, "Aktualny czas gry: %d ", gra.czas_gry->aktualny_czas);
+    mvwprintw(gra.status.win->win, 0, 25, "Aktualny wynik: %d ", gra.status.wynik);
     mvwprintw(gra.status.win->win, 1, 20, "Szymon Drywa 203668 Politechnika ");
     wrefresh(gra.status.win->win);
 }
@@ -545,7 +599,12 @@ void podczasgry(stan_gry &gra)
     {
         for (int i = 0; i < gra.plansza.auta; i++)
         {
-            // maluj_coiny(gra);
+            if (gra.czas_gry->licznik_wyswietlania_coinow == gra.czas_gry->wyswietlanie_coinow)
+            {
+                usun_poprzednie_coiny(gra);
+                nowe_coiny(gra);
+            }
+            odswierz_coiny(gra);
             odmierz_czas(gra);
             status_gry(gra);
             if (gra.czas_gry->czas % gra.car[i].speed == 0 || gra.czas_gry->czas % gra.car[i].speed == 1)
