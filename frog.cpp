@@ -60,9 +60,10 @@ struct stan_gry
         int speed = 3;
         int dlugosc = 2;
         int szerokosc = 3;
-        int zatrzymanie_szansa = 99;
+        int zatrzymanie_szansa = 80;
         int przyjacielski_szansa = 0;
         int postoj = 0;
+        int przyjaciel = 0;
         okno *win;
     } car[40];
     struct
@@ -174,6 +175,21 @@ int czy_przeszkoda4(stan_gry &gra)
             return false;
     return true;
 }
+int czy_podwozka(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+    {
+        if ((gra.frog.poz_poziom + 2 == gra.car[i].poz_poziom) && (gra.frog.poz_pion == gra.car[i].poz_pion))
+            return true;
+        if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion == gra.car[i].poz_pion))
+            return true;
+        if ((gra.frog.poz_poziom + 2 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 == gra.car[i].poz_pion))
+            return true;
+        if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 == gra.car[i].poz_pion))
+            return true;
+    }
+    return false;
+}
 void frog_jump(int ch, stan_gry &gra)
 {
     if (ch == 's' || ch == 'd' || ch == 'w' || ch == 'a')
@@ -200,6 +216,11 @@ void frog_jump(int ch, stan_gry &gra)
         if (czy_przeszkoda4(gra))
             gra.frog.poz_poziom--;
     }
+    else if (ch == 'e')
+    {
+        if (czy_podwozka(gra))
+            gra.frog.poz_poziom += 10;
+    }
     mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
     wattron(gra.frog.win->win, COLOR_PAIR(K_ZOLTY));
     mvwprintw(gra.frog.win->win, 0, 0, " ");
@@ -224,6 +245,15 @@ int czy_zatrzymanie(stan_gry &gra, int i)
     }
     return false;
 }
+int przyjacielski(stan_gry &gra, int i)
+{
+    int a = rand() % 100;
+    if (a >= gra.car[i].przyjacielski_szansa)
+    {
+        return true;
+    }
+    return false;
+}
 /// Funkcja malowania aut ///
 void car_go(stan_gry &gra, int i)
 {
@@ -231,11 +261,17 @@ void car_go(stan_gry &gra, int i)
     wclear(gra.car[i].win->win);
     wrefresh(gra.car[i].win->win);
     mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
-    wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI));
-    if (czy_zatrzymanie(gra, i))
-        gra.car[i].postoj = 1;
-    if (gra.frog.poz_poziom - 3 > gra.car[i].poz_poziom)
-        gra.car[i].postoj = 0;
+    if (gra.car[i].przyjaciel)
+        wattron(gra.car[i].win->win, COLOR_PAIR(K_ZIELONY));
+    else
+    {
+        wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI));
+        if (czy_zatrzymanie(gra, i))
+            gra.car[i].postoj = 1;
+
+        if (gra.frog.poz_poziom - 3 > gra.car[i].poz_poziom)
+            gra.car[i].postoj = 0;
+    }
     for (int a = 0; a < gra.car[i].dlugosc; a++)
     {
         for (int j = 0; j < gra.car[i].szerokosc; j++)
@@ -243,6 +279,7 @@ void car_go(stan_gry &gra, int i)
             mvwprintw(gra.car[i].win->win, a, j, "#");
         }
     }
+
     if (gra.car[i].postoj == 0)
     {
         gra.car[i].poz_pion += 1;
@@ -252,6 +289,9 @@ void car_go(stan_gry &gra, int i)
     {
         startowe_predkosci_aut(gra, i);
         gra.car[i].poz_pion = 1;
+        gra.car[i].przyjaciel = 0;
+        if (przyjacielski(gra, i))
+            gra.car[i].przyjaciel = 1;
     }
 
     usleep(7000);
