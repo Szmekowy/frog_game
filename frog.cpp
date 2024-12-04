@@ -35,6 +35,11 @@ struct przeszkoda
     int poz_pion;
     int poz_poz;
 };
+struct coiny
+{
+    int poz_pion;
+    int poz_poz;
+};
 struct stan_gry
 {
     timer *czas_gry;
@@ -45,6 +50,8 @@ struct stan_gry
         int auta;
         int ilosc_przeszkod = 100;
         przeszkoda pozyjce_przeszkod[100];
+        int ilosc_coin = 10;
+        coiny pozyjce_coinow[10];
     } plansza;
     struct
     {
@@ -61,7 +68,7 @@ struct stan_gry
         int dlugosc = 2;
         int szerokosc = 3;
         int zatrzymanie_szansa = 80;
-        int przyjacielski_szansa = 0;
+        int przyjacielski_szansa = 50;
         int postoj = 0;
         int przyjaciel = 0;
         okno *win;
@@ -76,6 +83,26 @@ struct stan_gry
 int ekran_startowy();
 void startowe_predkosci_aut(stan_gry &gra, int i);
 /// zapis i odczyty z pliku ///
+void ulica(stan_gry &gra)
+{
+    for (int i = 3; i < gra.plansza.szer; i += gra.car->szerokosc + 3)
+    {
+        for (int j = 1; j < gra.plansza.wys; j++)
+            mvprintw(j, i, "|");
+    }
+}
+void maluj_coiny(stan_gry &gra)
+{
+    int linia = rand() % (gra.plansza.szer + 1) - 1;
+    int wys = rand() % (gra.plansza.wys + 1) - 1;
+    okno *coin = new okno;
+    coin->win = newwin(1, 1, wys, linia);
+    //  gra.plansza.pozyjce_przeszkod[k].poz_pion = wys;
+    // gra.plansza.pozyjce_przeszkod[k].poz_poz = linia;
+    wattron(coin->win, COLOR_PAIR(K_ZOLTY));
+    mvwprintw(coin->win, 0, 0, "o");
+    wrefresh(coin->win);
+}
 void odczyt_rozgrywki(stan_gry &gra) // przypisanie grze początkowego stanu
 {
     FILE *plik_z_poziomami;
@@ -179,11 +206,8 @@ int czy_podwozka(stan_gry &gra)
 {
     for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
     {
-        if ((gra.frog.poz_poziom + 2 == gra.car[i].poz_poziom) && (gra.frog.poz_pion == gra.car[i].poz_pion))
-            return true;
+
         if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion == gra.car[i].poz_pion))
-            return true;
-        if ((gra.frog.poz_poziom + 2 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 == gra.car[i].poz_pion))
             return true;
         if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 == gra.car[i].poz_pion))
             return true;
@@ -358,6 +382,7 @@ void czerwone_pole(stan_gry gra) // rysowanie czerwonej obwodki
         mvprintw(gra.plansza.wys, i, " ");
         refresh();
     }
+    attroff(COLOR_PAIR(K_CZEROWNY));
 }
 void zielone_pole(stan_gry gra) // rysowanie mety
 {
@@ -419,8 +444,10 @@ void przeszkody(int linia, int wys, stan_gry &gra, int k)
     przeszkoda->win = newwin(1, 1, wys, linia);
     gra.plansza.pozyjce_przeszkod[k].poz_pion = wys;
     gra.plansza.pozyjce_przeszkod[k].poz_poz = linia;
+    wattron(przeszkoda->win, COLOR_PAIR(K_CZEROWNY));
     mvwprintw(przeszkoda->win, 0, 0, "#");
     wrefresh(przeszkoda->win);
+    // wattroff(przeszkoda->win,COLOR_PAIR(K_CZEROWNY));
 }
 /// nadanie wartosci elementą gry ///
 void startowe_pozycje_aut(stan_gry &gra) // poczatkowe pozycje
@@ -490,6 +517,7 @@ int ekran_startowy()
 }
 void start_gry(stan_gry &gra) // inicjalizacja początkowego stanu gry
 {
+    ulica(gra);
     czerwone_pole(gra);
     startowe_pozycje_aut(gra);
     for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
@@ -517,6 +545,7 @@ void podczasgry(stan_gry &gra)
     {
         for (int i = 0; i < gra.plansza.auta; i++)
         {
+            // maluj_coiny(gra);
             odmierz_czas(gra);
             status_gry(gra);
             if (gra.czas_gry->czas % gra.car[i].speed == 0 || gra.czas_gry->czas % gra.car[i].speed == 1)
