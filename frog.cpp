@@ -43,8 +43,8 @@ struct stan_gry
         int wys;
         int szer;
         int auta;
-        int ilosc_przeszkod = 20;
-        przeszkoda pozyjce_przeszkod[20];
+        int ilosc_przeszkod = 100;
+        przeszkoda pozyjce_przeszkod[100];
     } plansza;
     struct
     {
@@ -60,6 +60,9 @@ struct stan_gry
         int speed = 3;
         int dlugosc = 2;
         int szerokosc = 3;
+        int zatrzymanie_szansa = 99;
+        int przyjacielski_szansa = 0;
+        int postoj = 0;
         okno *win;
     } car[40];
     struct
@@ -143,43 +146,58 @@ void odmierz_czas(stan_gry &gra)
 /// funkcja timera ///
 
 /// Funkcja do poruszania żabą  ///
+int czy_przeszkoda1(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        if ((gra.frog.poz_pion + 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
+            return false;
+    return true;
+}
+int czy_przeszkoda2(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        if ((gra.frog.poz_pion - 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
+            return false;
+    return true;
+}
+int czy_przeszkoda3(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        if ((gra.frog.poz_poziom + 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
+            return false;
+    return true;
+}
+int czy_przeszkoda4(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        if ((gra.frog.poz_poziom - 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
+            return false;
+    return true;
+}
 void frog_jump(int ch, stan_gry &gra)
 {
     if (ch == 's' || ch == 'd' || ch == 'w' || ch == 'a')
         gra.czas_gry->licznik = 0;
     wclear(gra.frog.win->win);
     wrefresh(gra.frog.win->win);
-    int wart = 1;
     if (ch == 's')
     {
-        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
-            if ((gra.frog.poz_pion + 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
-                wart = 0;
-        if (wart)
+        if (czy_przeszkoda1(gra))
             gra.frog.poz_pion++;
     }
     else if (ch == 'w')
     {
-        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
-            if ((gra.frog.poz_pion - 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
-                wart = 0;
-        if (wart)
+        if (czy_przeszkoda2(gra))
             gra.frog.poz_pion--;
     }
     else if (ch == 'd')
     {
-        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
-            if ((gra.frog.poz_poziom + 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
-                wart = 0;
-        if (wart)
+        if (czy_przeszkoda3(gra))
             gra.frog.poz_poziom++;
     }
     else if (ch == 'a')
     {
-        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
-            if ((gra.frog.poz_poziom - 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
-                wart = 0;
-        if (wart)
+        if (czy_przeszkoda4(gra))
             gra.frog.poz_poziom--;
     }
     mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
@@ -188,7 +206,24 @@ void frog_jump(int ch, stan_gry &gra)
     wrefresh(gra.frog.win->win);
 }
 /// Funkcja do poruszania żabą ///
+int czy_zatrzymanie(stan_gry &gra, int i)
+{
+    int a = rand() % 100;
+    if (a >= gra.car[i].zatrzymanie_szansa)
+    {
 
+        int zakres[4] = {0};
+        zakres[0] = gra.car[i].poz_pion - 1;
+        zakres[1] = gra.car[i].poz_pion + gra.car[i].dlugosc + 1;
+        zakres[2] = gra.car[i].poz_poziom;
+        zakres[3] = gra.car[i].poz_poziom + gra.car[i].szerokosc - 1;
+        if (gra.frog.poz_pion >= zakres[0] && gra.frog.poz_pion <= zakres[1] && gra.frog.poz_poziom >= zakres[2] && gra.frog.poz_poziom <= zakres[3])
+        {
+            return true;
+        }
+    }
+    return false;
+}
 /// Funkcja malowania aut ///
 void car_go(stan_gry &gra, int i)
 {
@@ -197,6 +232,10 @@ void car_go(stan_gry &gra, int i)
     wrefresh(gra.car[i].win->win);
     mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
     wattron(gra.car[i].win->win, COLOR_PAIR(K_NIEBIESKI));
+    if (czy_zatrzymanie(gra, i))
+        gra.car[i].postoj = 1;
+    if (gra.frog.poz_poziom - 3 > gra.car[i].poz_poziom)
+        gra.car[i].postoj = 0;
     for (int a = 0; a < gra.car[i].dlugosc; a++)
     {
         for (int j = 0; j < gra.car[i].szerokosc; j++)
@@ -204,13 +243,17 @@ void car_go(stan_gry &gra, int i)
             mvwprintw(gra.car[i].win->win, a, j, "#");
         }
     }
-    gra.car[i].poz_pion += 1;
+    if (gra.car[i].postoj == 0)
+    {
+        gra.car[i].poz_pion += 1;
+    }
     wrefresh(gra.car[i].win->win);
     if (gra.car[i].poz_pion >= gra.plansza.wys - 1)
     {
         startowe_predkosci_aut(gra, i);
         gra.car[i].poz_pion = 1;
     }
+
     usleep(7000);
 }
 /// Funkcja malowania aut ///
@@ -223,6 +266,8 @@ int czy_kolicja(stan_gry &gra)
         int zakres[4] = {0};
         zakres[0] = gra.car[i].poz_pion - 1;
         zakres[1] = gra.car[i].poz_pion + gra.car[i].dlugosc - 2;
+        if (czy_zatrzymanie(gra, i))
+            zakres[1]++;
         zakres[2] = gra.car[i].poz_poziom;
         zakres[3] = gra.car[i].poz_poziom + gra.car[i].szerokosc - 1;
         if (gra.frog.poz_pion >= zakres[0] && gra.frog.poz_pion <= zakres[1] && gra.frog.poz_poziom >= zakres[2] && gra.frog.poz_poziom <= zakres[3])
@@ -440,7 +485,7 @@ void podczasgry(stan_gry &gra)
             kolizja = czy_kolicja(gra);
             if (kolizja == 1 || wygrana(gra))
                 break;
-            if (gra.czas_gry->licznik >= gra.czas_gry->limit)
+            if (gra.czas_gry->licznik >= gra.czas_gry->limit && ch != ERR)
                 frog_jump(ch, gra);
             flushinp();
             kolizja = czy_kolicja(gra);
