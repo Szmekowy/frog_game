@@ -30,6 +30,11 @@ struct timer
     int aktualny_czas = 0;
     const int kontrolne = 100;
 };
+struct przeszkoda
+{
+    int poz_pion;
+    int poz_poz;
+};
 struct stan_gry
 {
     timer *czas_gry;
@@ -38,6 +43,8 @@ struct stan_gry
         int wys;
         int szer;
         int auta;
+        int ilosc_przeszkod = 20;
+        przeszkoda pozyjce_przeszkod[20];
     } plansza;
     struct
     {
@@ -142,14 +149,39 @@ void frog_jump(int ch, stan_gry &gra)
         gra.czas_gry->licznik = 0;
     wclear(gra.frog.win->win);
     wrefresh(gra.frog.win->win);
+    int wart = 1;
     if (ch == 's')
-        gra.frog.poz_pion++;
+    {
+        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+            if ((gra.frog.poz_pion + 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
+                wart = 0;
+        if (wart)
+            gra.frog.poz_pion++;
+    }
     else if (ch == 'w')
-        gra.frog.poz_pion--;
+    {
+        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+            if ((gra.frog.poz_pion - 1 == gra.plansza.pozyjce_przeszkod[i].poz_pion) && (gra.frog.poz_poziom == gra.plansza.pozyjce_przeszkod[i].poz_poz))
+                wart = 0;
+        if (wart)
+            gra.frog.poz_pion--;
+    }
     else if (ch == 'd')
-        gra.frog.poz_poziom++;
+    {
+        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+            if ((gra.frog.poz_poziom + 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
+                wart = 0;
+        if (wart)
+            gra.frog.poz_poziom++;
+    }
     else if (ch == 'a')
-        gra.frog.poz_poziom--;
+    {
+        for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+            if ((gra.frog.poz_poziom - 1 == gra.plansza.pozyjce_przeszkod[i].poz_poz) && (gra.frog.poz_pion == gra.plansza.pozyjce_przeszkod[i].poz_pion))
+                wart = 0;
+        if (wart)
+            gra.frog.poz_poziom--;
+    }
     mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
     wattron(gra.frog.win->win, COLOR_PAIR(K_ZOLTY));
     mvwprintw(gra.frog.win->win, 0, 0, " ");
@@ -172,14 +204,6 @@ void car_go(stan_gry &gra, int i)
             mvwprintw(gra.car[i].win->win, a, j, "#");
         }
     }
-    /*
-    mvwprintw(gra.car[i].win->win, 0, 0, "#");
-    mvwprintw(gra.car[i].win->win, 1, 0, "#");
-    mvwprintw(gra.car[i].win->win, 0, 1, "#");
-    mvwprintw(gra.car[i].win->win, 1, 1, "#");
-    mvwprintw(gra.car[i].win->win, 0, 2, "#");
-    mvwprintw(gra.car[i].win->win, 1, 2, "#");
-    */
     gra.car[i].poz_pion += 1;
     wrefresh(gra.car[i].win->win);
     if (gra.car[i].poz_pion >= gra.plansza.wys - 1)
@@ -196,10 +220,14 @@ int czy_kolicja(stan_gry &gra)
 {
     for (int i = 0; i < gra.plansza.auta; i++)
     {
-        if (gra.frog.poz_pion == gra.car[i].poz_pion && gra.frog.poz_poziom == gra.car[i].poz_poziom || gra.frog.poz_pion == gra.car[i].poz_pion - 1 && gra.frog.poz_poziom == gra.car[i].poz_poziom)
+        int zakres[4] = {0};
+        zakres[0] = gra.car[i].poz_pion - 1;
+        zakres[1] = gra.car[i].poz_pion + gra.car[i].dlugosc - 2;
+        zakres[2] = gra.car[i].poz_poziom;
+        zakres[3] = gra.car[i].poz_poziom + gra.car[i].szerokosc - 1;
+        if (gra.frog.poz_pion >= zakres[0] && gra.frog.poz_pion <= zakres[1] && gra.frog.poz_poziom >= zakres[2] && gra.frog.poz_poziom <= zakres[3])
         {
             return 1;
-            break;
         }
     }
     return 0;
@@ -263,23 +291,60 @@ void status_gry(stan_gry &gra)
 {
     // pamieć dla okna statusu
     okno *status_window = new okno;
-    status_window->win = newwin(2, 22, gra.plansza.wys + 2, gra.status.poz_poziom);
+    status_window->win = newwin(2, 100, gra.plansza.wys + 2, gra.status.poz_poziom);
     gra.status.win = status_window;
     // pamieć dla okna statusu
     wattron(gra.status.win->win, COLOR_PAIR(K_BIALY));
     mvwprintw(gra.status.win->win, 0, 0, "Aktualny czas gry: %d ", gra.czas_gry->aktualny_czas);
+    mvwprintw(gra.status.win->win, 1, 20, "Szymon Drywa 203668 Politechnika ");
     wrefresh(gra.status.win->win);
 }
 /// wyswietlenie statusu gry ///
 
+/// losowe powstawanie elementow ///
+int losuj_l(stan_gry &gra)
+{
+    int losuj_linie;
+    losuj_linie = rand() % gra.plansza.auta;
+    return losuj_linie;
+}
+int losuj_w(stan_gry &gra)
+{
+    int losuj_wys;
+    losuj_wys = rand() % (gra.plansza.wys - 1) + 1;
+    return losuj_wys;
+}
+/// losowe powstawanie elementow ///
+
+/// malowanie dziur ///
+
+/// malowanie dziur ///
+void maluj_dziury(int linia, int wys, stan_gry &gra)
+{
+    linia = gra.car[linia].poz_poziom + 1;
+    okno *dziura = new okno;
+    dziura->win = newwin(1, 1, wys, linia);
+    mvwprintw(dziura->win, 0, 0, "*");
+    wrefresh(dziura->win);
+}
+void przeszkody(int linia, int wys, stan_gry &gra, int k)
+{
+    linia = gra.car[linia].poz_poziom + gra.car[linia].szerokosc + 1;
+    okno *przeszkoda = new okno;
+    przeszkoda->win = newwin(1, 1, wys, linia);
+    gra.plansza.pozyjce_przeszkod[k].poz_pion = wys;
+    gra.plansza.pozyjce_przeszkod[k].poz_poz = linia;
+    mvwprintw(przeszkoda->win, 0, 0, "#");
+    wrefresh(przeszkoda->win);
+}
 /// nadanie wartosci elementą gry ///
 void startowe_pozycje_aut(stan_gry &gra) // poczatkowe pozycje
 {
     int a = 5;
     for (int i = 0; i < gra.plansza.auta; i++)
     {
-        gra.car[i].poz_poziom = a + 1;
-        a += gra.car[i].szerokosc + 1;
+        gra.car[i].poz_poziom = a;
+        a += gra.car[i].szerokosc + 3;
     }
 }
 void startowe_predkosci_aut(stan_gry &gra, int i) // poczatkowa predkosc
@@ -341,8 +406,10 @@ int ekran_startowy()
 void start_gry(stan_gry &gra) // inicjalizacja początkowego stanu gry
 {
     czerwone_pole(gra);
-    zielone_pole(gra);
     startowe_pozycje_aut(gra);
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        przeszkody(losuj_l(gra), losuj_w(gra), gra, i);
+    zielone_pole(gra);
     for (int i = 0; i < gra.plansza.auta; i++)
     {
         startowe_predkosci_aut(gra, i);
@@ -360,6 +427,7 @@ void podczasgry(stan_gry &gra)
     timeout(100);
     int ch = ERR;
     int kolizja = 0;
+    int pom_akt = 0;
     while (ch != 'p' || kolizja == 1 || wygrana(gra))
     {
         for (int i = 0; i < gra.plansza.auta; i++)
@@ -383,6 +451,13 @@ void podczasgry(stan_gry &gra)
         }
         if (kolizja == 1 || wygrana(gra))
             break;
+        /*
+    if ((gra.czas_gry->aktualny_czas) % 2 == 0&&gra.czas_gry->aktualny_czas!=pom_akt)
+        {
+            maluj_dziury(losuj_l(gra), losuj_w(gra), gra);
+            pom_akt=gra.czas_gry->aktualny_czas;
+        }
+        */
     }
     if (kolizja == 1)
         przegrana(gra);
@@ -417,12 +492,11 @@ int main()
     odczyt_rozgrywki(gra);
     FILE *plik;
     plik = fopen("struktura.txt", "r+");
-    // Tworzymy okno o rozmiarze 2x2 dla żaby
     okno *frog_window = new okno;
     frog_window->win = newwin(1, 1, gra.frog.poz_pion, gra.frog.poz_poziom);
     gra.frog.win = frog_window;
     podczasgry(gra);
     fclose(plik);
-    endwin(); // Kończy pracę z ncurses
+    endwin();
     return 0;
 }
