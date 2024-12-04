@@ -1,9 +1,10 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
-#include <ncurses.h>
+#include <curses.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <time.h>
 #include <cstdlib>
+
 using namespace std;
 
 #define K_CZEROWNY 1
@@ -11,6 +12,8 @@ using namespace std;
 #define K_ZOLTY 3
 #define K_ZIELONY 4
 #define K_BIALY 5
+#define K_COIN 6
+#define K_COINA 7
 
 struct okno
 {
@@ -36,11 +39,13 @@ struct przeszkoda
 {
     int poz_pion;
     int poz_poz;
+    okno *win;
 };
 struct coiny
 {
     int poz_pion;
     int poz_poz;
+    okno *win;
 };
 struct stan_gry
 {
@@ -50,10 +55,10 @@ struct stan_gry
         int wys;
         int szer;
         int auta;
-        int ilosc_przeszkod = 100;
-        przeszkoda pozyjce_przeszkod[100];
-        int ilosc_coin = 5;
-        coiny pozyjce_coinow[5];
+        int ilosc_przeszkod;
+        przeszkoda *pozyjce_przeszkod;
+        int ilosc_coin;
+        coiny *pozyjce_coinow;
     } plansza;
     struct
     {
@@ -66,14 +71,14 @@ struct stan_gry
     {
         int poz_pion = 1;
         int poz_poziom = 5;
-        int speed = 3;
-        int dlugosc = 2;
-        int szerokosc = 3;
-        int zatrzymanie_szansa = 80;
-        int przyjacielski_szansa = 50;
+        int speed;
+        int dlugosc;
+        int szerokosc;
+        int zatrzymanie_szansa;
+        int przyjacielski_szansa;
         int postoj = 0;
         int przyjaciel = 0;
-        okno *win;
+        okno *win = NULL;
     } car[40];
     struct
     {
@@ -83,9 +88,27 @@ struct stan_gry
         okno *win;
     } status;
 };
+void usuwanie_pamieci(stan_gry &gra)
+{
+    delete gra.czas_gry;
+    delete gra.status.win;
+    delete gra.frog.win;
+    for (int i = 0; i < gra.plansza.auta; i++)
+    {
+        if (gra.car[i].win != NULL)
+            delete gra.car[i].win;
+    }
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+        delete gra.plansza.pozyjce_coinow[i].win;
+    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+        delete gra.plansza.pozyjce_przeszkod[i].win;
+    delete[] gra.plansza.pozyjce_coinow;
+    delete[] gra.plansza.pozyjce_przeszkod;
+}
 int ekran_startowy();
 void startowe_predkosci_aut(stan_gry &gra, int i);
 /// zapis i odczyty z pliku ///
+
 void ulica(stan_gry &gra)
 {
     for (int i = 3; i < gra.plansza.szer; i += gra.car->szerokosc + 3)
@@ -100,8 +123,19 @@ void nowe_coiny(stan_gry &gra)
     {
         int linia = rand() % (gra.plansza.szer + 1) - 2;
         int wys = rand() % (gra.plansza.wys - 1) + 1;
+        while ((linia - 3) % 3 == 0)
+            linia = rand() % (gra.plansza.szer + 1) - 2;
         gra.plansza.pozyjce_coinow[i].poz_pion = wys;
         gra.plansza.pozyjce_coinow[i].poz_poz = linia;
+    }
+}
+void ekrany_dla_coiny(stan_gry &gra)
+{
+    for (int i = 0; i < gra.plansza.ilosc_coin; i++)
+    {
+        okno *coin = new okno;
+        gra.plansza.pozyjce_coinow[i].win = coin;
+        gra.plansza.pozyjce_coinow[i].win->win = newwin(1, 1, 0, 0);
     }
 }
 void odswierz_coiny(stan_gry &gra)
@@ -110,11 +144,13 @@ void odswierz_coiny(stan_gry &gra)
     {
         if (gra.plansza.pozyjce_coinow[i].poz_pion != -1)
         {
-            okno *coin = new okno;
-            coin->win = newwin(1, 1, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
-            wattron(coin->win, COLOR_PAIR(K_ZOLTY));
-            mvwprintw(coin->win, 0, 0, "o");
-            wrefresh(coin->win);
+            mvwin(gra.plansza.pozyjce_coinow[i].win->win, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
+            if (gra.frog.poz_pion == gra.plansza.pozyjce_coinow[i].poz_pion && gra.frog.poz_poziom == gra.plansza.pozyjce_coinow[i].poz_poz)
+                wattron(gra.plansza.pozyjce_coinow[i].win->win, COLOR_PAIR(K_COINA));
+            else
+                wattron(gra.plansza.pozyjce_coinow[i].win->win, COLOR_PAIR(K_COIN));
+            mvwprintw(gra.plansza.pozyjce_coinow[i].win->win, 0, 0, "o");
+            wrefresh(gra.plansza.pozyjce_coinow[i].win->win);
         }
     }
 }
@@ -124,10 +160,10 @@ void usun_poprzednie_coiny(stan_gry &gra)
     {
         if (gra.plansza.pozyjce_coinow[i].poz_pion != -1)
         {
-            okno *coin = new okno;
-            coin->win = newwin(1, 1, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
-            mvwprintw(coin->win, 0, 0, " ");
-            wrefresh(coin->win);
+            mvwin(gra.plansza.pozyjce_coinow[i].win->win, gra.plansza.pozyjce_coinow[i].poz_pion, gra.plansza.pozyjce_coinow[i].poz_poz);
+            wattroff(gra.plansza.pozyjce_coinow[i].win->win, COLOR_PAIR(K_COIN));
+            mvwprintw(gra.plansza.pozyjce_coinow[i].win->win, 0, 0, " ");
+            wrefresh(gra.plansza.pozyjce_coinow[i].win->win);
         }
     }
 }
@@ -139,18 +175,26 @@ void odczyt_rozgrywki(stan_gry &gra) // przypisanie grze początkowego stanu
     int poziom;
     int pom_dlug = 0;
     int pom_szer = 0;
+    int pom_z_sz = 0;
+    int pom_p_sz = 0;
     while (wczytany_poziom--)
     {
-        fscanf(plik_z_poziomami, "%d", &poziom);
-        fscanf(plik_z_poziomami, "%d", &gra.plansza.wys);
-        fscanf(plik_z_poziomami, "%d", &gra.plansza.szer);
-        fscanf(plik_z_poziomami, "%d", &gra.plansza.auta);
-        fscanf(plik_z_poziomami, "%d", &pom_dlug);
-        fscanf(plik_z_poziomami, "%d", &pom_szer);
+        fscanf_s(plik_z_poziomami, "%d", &poziom);
+        fscanf_s(plik_z_poziomami, "%d", &gra.plansza.wys);
+        fscanf_s(plik_z_poziomami, "%d", &gra.plansza.szer);
+        fscanf_s(plik_z_poziomami, "%d", &gra.plansza.auta);
+        fscanf_s(plik_z_poziomami, "%d", &pom_dlug);
+        fscanf_s(plik_z_poziomami, "%d", &pom_szer);
+        fscanf_s(plik_z_poziomami, "%d", &gra.plansza.ilosc_coin);
+        fscanf_s(plik_z_poziomami, "%d", &gra.plansza.ilosc_przeszkod);
+        fscanf_s(plik_z_poziomami, "%d", &pom_z_sz);
+        fscanf_s(plik_z_poziomami, "%d", &pom_p_sz);
         for (int i = 0; i < gra.plansza.auta; i++)
         {
             gra.car[i].dlugosc = pom_dlug;
             gra.car[i].szerokosc = pom_szer;
+            gra.car[i].zatrzymanie_szansa = pom_z_sz;
+            gra.car[i].przyjacielski_szansa = pom_p_sz;
         }
     }
 }
@@ -183,7 +227,6 @@ void odczyt(stan_gry &gra, FILE *plik)
 /// funkcja timera ///
 void odmierz_czas(stan_gry &gra)
 {
-    usleep(6000);
     gra.czas_gry->iteracja++;
     gra.czas_gry->licznik_czasu++;
     gra.czas_gry->licznik_wyswietlania_coinow++;
@@ -236,12 +279,10 @@ int czy_przeszkoda4(stan_gry &gra)
 }
 int czy_podwozka(stan_gry &gra)
 {
-    for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+    for (int i = 0; i < gra.plansza.auta; i++)
     {
 
-        if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion == gra.car[i].poz_pion))
-            return true;
-        if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 == gra.car[i].poz_pion))
+        if ((gra.frog.poz_poziom + 1 == gra.car[i].poz_poziom) && (gra.frog.poz_pion + 1 >= gra.car[i].poz_pion) && (gra.car[i].przyjaciel == 1) && (gra.frog.poz_pion + 1 <= gra.car[i].poz_pion + gra.car[i].dlugosc - 1))
             return true;
     }
     return false;
@@ -299,7 +340,7 @@ void frog_jump(int ch, stan_gry &gra)
             gra.status.wynik++;
     }
     mvwin(gra.frog.win->win, gra.frog.poz_pion, gra.frog.poz_poziom);
-    wattron(gra.frog.win->win, COLOR_PAIR(K_ZOLTY));
+    wattron(gra.frog.win->win, COLOR_PAIR(K_ZIELONY));
     mvwprintw(gra.frog.win->win, 0, 0, " ");
     wrefresh(gra.frog.win->win);
 }
@@ -335,6 +376,7 @@ int przyjacielski(stan_gry &gra, int i)
 void car_go(stan_gry &gra, int i)
 {
     nodelay(stdscr, TRUE);
+
     wclear(gra.car[i].win->win);
     wrefresh(gra.car[i].win->win);
     mvwin(gra.car[i].win->win, gra.car[i].poz_pion, gra.car[i].poz_poziom);
@@ -370,8 +412,7 @@ void car_go(stan_gry &gra, int i)
         if (przyjacielski(gra, i))
             gra.car[i].przyjaciel = 1;
     }
-
-    usleep(7000);
+    napms(7);
 }
 /// Funkcja malowania aut ///
 
@@ -397,27 +438,30 @@ int czy_kolicja(stan_gry &gra)
 /// sprawdzanie kolizji zaby z autem ///
 
 /// sprawdzanie warunku wygranej i przegranej///
-int wygrana(stan_gry gra)
+int czy_wygrana(stan_gry &gra)
 {
     if (gra.frog.poz_poziom == gra.plansza.szer - 1)
     {
-        clear();
-        mvprintw(10, 10, "KONIEC GRY -> WYGRALES");
-        mvprintw(11, 10, "NACISNIJ P ABY ZAKONCZYC");
-        refresh();
-        delete gra.czas_gry;
         return 1;
     }
     else
         return 0;
 }
-void przegrana(stan_gry gra)
+void wygrana(stan_gry &gra)
+{
+    clear();
+    mvprintw(10, 10, "KONIEC GRY -> wygrales");
+    mvprintw(11, 10, "NACISNIJ P ABY ZAKONCZYC");
+    refresh();
+    usuwanie_pamieci(gra);
+}
+void przegrana(stan_gry &gra)
 {
     clear();
     mvprintw(10, 10, "KONIEC GRY");
     mvprintw(11, 10, "NACISNIJ P ABY ZAKONCZYC");
     refresh();
-    delete gra.czas_gry;
+    usuwanie_pamieci(gra);
 }
 /// sprawdzanie warunku wygranej i przegranej///
 
@@ -453,9 +497,6 @@ void zielone_pole(stan_gry gra) // rysowanie mety
 void status_gry(stan_gry &gra)
 {
     // pamieć dla okna statusu
-    okno *status_window = new okno;
-    status_window->win = newwin(2, 100, gra.plansza.wys + 2, gra.status.poz_poziom);
-    gra.status.win = status_window;
     // pamieć dla okna statusu
     wattron(gra.status.win->win, COLOR_PAIR(K_BIALY));
     mvwprintw(gra.status.win->win, 0, 0, "Aktualny czas gry: %d ", gra.czas_gry->aktualny_czas);
@@ -480,27 +521,20 @@ int losuj_w(stan_gry &gra)
 }
 /// losowe powstawanie elementow ///
 
-/// malowanie dziur ///
-
-/// malowanie dziur ///
-void maluj_dziury(int linia, int wys, stan_gry &gra)
+void ekrany_dla_przeszkod(stan_gry &gra, int i)
 {
-    linia = gra.car[linia].poz_poziom + 1;
-    okno *dziura = new okno;
-    dziura->win = newwin(1, 1, wys, linia);
-    mvwprintw(dziura->win, 0, 0, "*");
-    wrefresh(dziura->win);
+    okno *przeszkoda = new okno;
+    gra.plansza.pozyjce_przeszkod[i].win = przeszkoda;
 }
-void przeszkody(int linia, int wys, stan_gry &gra, int k)
+void przeszkody(int linia, int wys, stan_gry &gra, int i)
 {
     linia = gra.car[linia].poz_poziom + gra.car[linia].szerokosc + 1;
-    okno *przeszkoda = new okno;
-    przeszkoda->win = newwin(1, 1, wys, linia);
-    gra.plansza.pozyjce_przeszkod[k].poz_pion = wys;
-    gra.plansza.pozyjce_przeszkod[k].poz_poz = linia;
-    wattron(przeszkoda->win, COLOR_PAIR(K_CZEROWNY));
-    mvwprintw(przeszkoda->win, 0, 0, "#");
-    wrefresh(przeszkoda->win);
+    gra.plansza.pozyjce_przeszkod[i].win->win = newwin(1, 1, wys, linia);
+    gra.plansza.pozyjce_przeszkod[i].poz_pion = wys;
+    gra.plansza.pozyjce_przeszkod[i].poz_poz = linia;
+    wattron(gra.plansza.pozyjce_przeszkod[i].win->win, COLOR_PAIR(K_CZEROWNY));
+    mvwprintw(gra.plansza.pozyjce_przeszkod[i].win->win, 0, 0, "#");
+    wrefresh(gra.plansza.pozyjce_przeszkod[i].win->win);
     // wattroff(przeszkoda->win,COLOR_PAIR(K_CZEROWNY));
 }
 /// nadanie wartosci elementą gry ///
@@ -539,7 +573,7 @@ int ekran_startowy()
         mvprintw(17, 15, "Poziom drugi: ");
         mvprintw(19, 15, "Poziom trzeci: ");
         refresh();
-        usleep(1000);
+        napms(1);
         ch = getch();
         if (ch == 's')
         {
@@ -569,13 +603,27 @@ int ekran_startowy()
         return 1;
     return -1;
 }
+void przyznanie_pamieci_dla_tablic(stan_gry &gra)
+{
+    gra.plansza.pozyjce_przeszkod = new przeszkoda[gra.plansza.ilosc_przeszkod];
+    gra.plansza.pozyjce_coinow = new coiny[gra.plansza.ilosc_coin];
+}
 void start_gry(stan_gry &gra) // inicjalizacja początkowego stanu gry
 {
+    frog_jump(ERR, gra); // pokazanie zaby
+    przyznanie_pamieci_dla_tablic(gra);
+    okno *status_window = new okno;
+    status_window->win = newwin(2, 100, gra.plansza.wys + 2, gra.status.poz_poziom);
+    gra.status.win = status_window;
     ulica(gra);
     czerwone_pole(gra);
     startowe_pozycje_aut(gra);
+    ekrany_dla_coiny(gra);
     for (int i = 0; i < gra.plansza.ilosc_przeszkod; i++)
+    {
+        ekrany_dla_przeszkod(gra, i);
         przeszkody(losuj_l(gra), losuj_w(gra), gra, i);
+    }
     zielone_pole(gra);
     for (int i = 0; i < gra.plansza.auta; i++)
     {
@@ -591,11 +639,12 @@ void podczasgry(stan_gry &gra)
 {
     start_gry(gra);
     startowe_pozycje_aut(gra);
-    timeout(100);
+    // timeout(100);
+    nodelay(stdscr, TRUE);
     int ch = ERR;
     int kolizja = 0;
     int pom_akt = 0;
-    while (ch != 'p' || kolizja == 1 || wygrana(gra))
+    while (ch != 'p' || kolizja == 1 || czy_wygrana(gra))
     {
         for (int i = 0; i < gra.plansza.auta; i++)
         {
@@ -606,31 +655,31 @@ void podczasgry(stan_gry &gra)
             }
             odswierz_coiny(gra);
             odmierz_czas(gra);
+            if (gra.czas_gry->aktualny_czas >= 60)
+            {
+                kolizja = 1;
+                break;
+            }
             status_gry(gra);
             if (gra.czas_gry->czas % gra.car[i].speed == 0 || gra.czas_gry->czas % gra.car[i].speed == 1)
                 car_go(gra, i);
             ch = getch();
             kolizja = czy_kolicja(gra);
-            if (kolizja == 1 || wygrana(gra))
+            if (kolizja == 1 || czy_wygrana(gra))
                 break;
             if (gra.czas_gry->licznik >= gra.czas_gry->limit && ch != ERR)
                 frog_jump(ch, gra);
             flushinp();
             kolizja = czy_kolicja(gra);
-            if (kolizja == 1 || wygrana(gra))
+            if (gra.frog.poz_pion == 0 || gra.frog.poz_pion >= gra.plansza.wys)
+                kolizja = 1;
+            if (kolizja == 1 || czy_wygrana(gra))
                 break;
             if (ch == 'p')
                 break;
         }
-        if (kolizja == 1 || wygrana(gra))
+        if (kolizja == 1 || czy_wygrana(gra))
             break;
-        /*
-    if ((gra.czas_gry->aktualny_czas) % 2 == 0&&gra.czas_gry->aktualny_czas!=pom_akt)
-        {
-            maluj_dziury(losuj_l(gra), losuj_w(gra), gra);
-            pom_akt=gra.czas_gry->aktualny_czas;
-        }
-        */
     }
     if (kolizja == 1)
         przegrana(gra);
@@ -640,7 +689,6 @@ void podczasgry(stan_gry &gra)
         ch = getch();
 }
 /// główna pętla gry ///
-
 /// inicjalizacja ncurses itp ///
 void ustawienia()
 {
@@ -655,6 +703,8 @@ void ustawienia()
     init_pair(K_ZOLTY, COLOR_YELLOW, COLOR_YELLOW);
     init_pair(K_ZIELONY, COLOR_GREEN, COLOR_GREEN);
     init_pair(K_BIALY, COLOR_RED, COLOR_WHITE);
+    init_pair(K_COIN, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(K_COINA, COLOR_YELLOW, COLOR_GREEN);
 }
 /// inicjalizacja ncurses itp ///
 
@@ -663,13 +713,10 @@ int main()
     ustawienia();
     stan_gry gra;
     odczyt_rozgrywki(gra);
-    FILE *plik;
-    plik = fopen("struktura.txt", "r+");
     okno *frog_window = new okno;
     frog_window->win = newwin(1, 1, gra.frog.poz_pion, gra.frog.poz_poziom);
     gra.frog.win = frog_window;
     podczasgry(gra);
-    fclose(plik);
     endwin();
     return 0;
 }
