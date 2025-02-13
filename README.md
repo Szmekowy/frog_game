@@ -39,7 +39,7 @@ To compile and run the game, follow these steps:
 
 3) Navigate to the project directory: cd frog_game
 
-4) Compile the game: g++ -o frog_game main.cpp -lncurses
+4) Compile the game: g++ -o frog_game frog.cpp -lncurses
 
 5) Run the game: ./frog_game
 
