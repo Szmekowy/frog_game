@@ -1,5 +1,5 @@
 # Frog Game
-
+![Frog](images/frog.gif)
 ### General info
 
 Frog Game is an arcade-style game inspired by Crossy Road. The player controls a frog attempting to cross a busy road while avoiding cars. Unlike traditional obstacle-dodging games, this version introduces a unique mechanic where green cars can provide the player with a ride to safety. Additionally, a stalking stork adds an extra layer of challenge, keeping the player on their toes. The game was developed using C/C++ with the ncurses library.
